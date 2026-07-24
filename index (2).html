@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Bắn Zombie - Thử Thách Boss Đột Biến</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #3b352b; 
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-container {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #6d4c41;
+            min-width: 260px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+        .stats-display {
+            margin-bottom: 10px;
+        }
+        #levelInfo {
+            font-size: 22px;
+            font-weight: bold;
+            color: #ff9800;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        .defense-bar {
+            background-color: #333;
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 5px;
+            border: 1px solid #111;
+        }
+        #defenseHealthEl {
+            background-color: #4CAF50;
+            height: 100%;
+            width: 100%;
+            transition: width 0.3s;
+        }
+        .upgrade-panel {
+            margin-top: 15px;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .btn-upgrade {
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+        }
+        .btn-repair { background-color: #ff9800; color: #fff; }
+        .btn-repair:hover { background-color: #f57c00; }
+        .btn-multi { background-color: #e91e63; }
+        .btn-multi:hover { background-color: #c2185b; }
+        .btn-rate { background-color: #9c27b0; }
+        .btn-rate:hover { background-color: #7b1fa2; }
+        .btn-speed { background-color: #2196F3; }
+        .btn-speed:hover { background-color: #1976d2; }
+        .btn-upgrade:disabled {
+            background-color: #444 !important;
+            cursor: not-allowed;
+            color: #888;
+        }
+        .popup-screen {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(20, 15, 10, 0.95);
+            padding: 40px 60px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+        #gameOverScreen { border: 2px solid #ff4c4c; box-shadow: 0 0 30px rgba(255, 76, 76, 0.6); }
+        #gameOverScreen h1 { color: #ff4c4c; font-size: 48px; margin: 0 0 10px 0; }
+        #levelCompleteScreen { border: 2px solid #4CAF50; box-shadow: 0 0 30px rgba(76, 255, 85, 0.6); }
+        #levelCompleteScreen h1 { color: #4CAF50; font-size: 48px; margin: 0 0 10px 0; }
+        .reward-text { color: #ffeb3b; font-size: 20px; margin: 15px 0; font-weight: bold; }
+        .btn-action {
+            margin-top: 20px;
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-action:hover { background-color: #45a049; }
+        .instructions { font-size: 13px; color: #ccc; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <div class="stats-display">
+            <div id="levelInfo">MÀN 1 (0/10)</div>
+            <h2 style="margin: 0; color: #ffeb3b;">Điểm: <span id="scoreEl">0</span></h2>
+            <div style="margin-top: 10px; font-size: 14px; font-weight: bold;">Độ bền hàng rào gỗ: <span id="defenseText">100/100</span></div>
+            <div class="defense-bar">
+                <div id="defenseHealthEl"></div>
+            </div>
+        </div>
+        
+        <div class="upgrade-panel">
+            <button id="btnRepair" class="btn-upgrade btn-repair" disabled>
+                <span>🪵 Đóng lại ván gỗ</span>
+                <span>50đ</span>
+            </button>
+            <button id="btnMulti" class="btn-upgrade btn-multi" disabled>
+                <span>🔫 Thêm nòng súng (Cấp <span id="lvlMulti">1</span>)</span>
+                <span id="costMulti">100đ</span>
+            </button>
+            <button id="btnRate" class="btn-upgrade btn-rate" disabled>
+                <span>⚡ Tốc độ xả đạn (Cấp <span id="lvlRate">1</span>)</span>
+                <span id="costRate">75đ</span>
+            </button>
+            <button id="btnSpeed" class="btn-upgrade btn-speed" disabled>
+                <span>🚀 Tốc độ bay đạn (Cấp <span id="lvlSpeed">1</span>)</span>
+                <span id="costSpeed">50đ</span>
+            </button>
+        </div>
+
+        <div class="instructions">
+            <p>⌨️ <strong>W, A, S, D</strong>: Di chuyển</p>
+            <p>🖱️ <strong>Giữ chuột trái</strong>: Xả đạn</p>
+            <p>⚠️ <strong>Lưu ý</strong>: Trùm cuối mỗi màn rất nhiều máu!</p>
+        </div>
+    </div>
+
+    <!-- Màn hình Thua -->
+    <div id="gameOverScreen" class="popup-screen">
+        <h1>HÀNG RÀO ĐÃ VỠ!</h1>
+        <h2 style="margin: 10px 0;">Sống sót đến màn: <span id="finalLevel">1</span></h2>
+        <h3 style="margin: 10px 0;">Điểm số: <span id="finalScore">0</span></h3>
+        <button id="restartBtn" class="btn-action">Chơi Lại Từ Đầu</button>
+    </div>
+
+    <!-- Màn hình Qua Màn -->
+    <div id="levelCompleteScreen" class="popup-screen">
+        <h1>QUA MÀN THÀNH CÔNG!</h1>
+        <div class="reward-text" id="rewardText">Phần thưởng: +200 Điểm & Sửa 100% hàng rào!</div>
+        <button id="nextLevelBtn" class="btn-action">Tiến Vào Màn Tiếp Theo</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // DOM Elements
+        const scoreEl = document.getElementById('scoreEl');
+        const levelInfoEl = document.getElementById('levelInfo');
+        const defenseTextEl = document.getElementById('defenseText');
+        const defenseHealthBarEl = document.getElementById('defenseHealthEl');
+        
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const levelCompleteScreen = document.getElementById('levelCompleteScreen');
+        const rewardTextEl = document.getElementById('rewardText');
+
+        // Nút bấm
+        const restartBtn = document.getElementById('restartBtn');
+        const nextLevelBtn = document.getElementById('nextLevelBtn');
+        const btnRepair = document.getElementById('btnRepair');
+        const btnMulti = document.getElementById('btnMulti');
+        const btnRate = document.getElementById('btnRate');
+        const btnSpeed = document.getElementById('btnSpeed');
+
+        // Game State
+        let score = 0;
+        let gameActive = false;
+        let animationId;
+        let spawnInterval;
+        let mouseX = canvas.width / 2;
+        let mouseY = canvas.height / 2;
+        let isShooting = false;
+        let lastShotTime = 0;
+        const FENCE_X = 280;
+
+        // Level State
+        let currentLevel = 1;
+        let zombiesToSpawn = 10;
+        let bossesToSpawn = 1;
+        let zombiesSpawnedCount = 0; 
+        let zombiesKilledCount = 0;  
+
+        // Stats
+        let defense = { hp: 100, maxHp: 100, repairCost: 50 };
+        let stats = {
+            multishot: { level: 1, cost: 100, val: 1 },
+            fireRate: { level: 1, cost: 75, val: 400 },
+            bulletSpeed: { level: 1, cost: 50, val: 12 },
+            damage: 1 // Sát thương mặc định mỗi viên đạn
+        };
+
+        function updateUI() {
+            scoreEl.innerHTML = score;
+            levelInfoEl.innerHTML = `MÀN ${currentLevel} (${zombiesKilledCount}/${zombiesToSpawn})`;
+            
+            defenseTextEl.innerText = `${Math.floor(defense.hp)}/${defense.maxHp}`;
+            defenseHealthBarEl.style.width = (defense.hp / defense.maxHp) * 100 + '%';
+            if(defense.hp < 30) defenseHealthBarEl.style.backgroundColor = '#f44336';
+            else if(defense.hp < 70) defenseHealthBarEl.style.backgroundColor = '#ff9800';
+            else defenseHealthBarEl.style.backgroundColor = '#4CAF50';
+
+            btnRepair.disabled = score < defense.repairCost || defense.hp >= defense.maxHp;
+            document.getElementById('lvlMulti').innerText = stats.multishot.level;
+            document.getElementById('costMulti').innerText = stats.multishot.cost + 'đ';
+            btnMulti.disabled = score < stats.multishot.cost;
+            document.getElementById('lvlRate').innerText = stats.fireRate.level;
+            document.getElementById('costRate').innerText = stats.fireRate.cost + 'đ';
+            btnRate.disabled = score < stats.fireRate.cost;
+            document.getElementById('lvlSpeed').innerText = stats.bulletSpeed.level;
+            document.getElementById('costSpeed').innerText = stats.bulletSpeed.cost + 'đ';
+            btnSpeed.disabled = score < stats.bulletSpeed.cost;
+        }
+
+        // Logic Nâng cấp
+        btnRepair.addEventListener('click', () => {
+            if (score >= defense.repairCost && defense.hp < defense.maxHp) {
+                score -= defense.repairCost;
+                defense.hp = Math.min(defense.maxHp, defense.hp + 30);
+                updateUI();
+            }
+        });
+        btnMulti.addEventListener('click', () => {
+            if (score >= stats.multishot.cost) {
+                score -= stats.multishot.cost;
+                stats.multishot.level++;
+                stats.multishot.val++;
+                stats.multishot.cost = Math.floor(stats.multishot.cost * 2.5);
+                updateUI();
+            }
+        });
+        btnRate.addEventListener('click', () => {
+            if (score >= stats.fireRate.cost) {
+                score -= stats.fireRate.cost;
+                stats.fireRate.level++;
+                stats.fireRate.val = Math.max(50, stats.fireRate.val * 0.7);
+                stats.fireRate.cost = Math.floor(stats.fireRate.cost * 1.8);
+                updateUI();
+            }
+        });
+        btnSpeed.addEventListener('click', () => {
+            if (score >= stats.bulletSpeed.cost) {
+                score -= stats.bulletSpeed.cost;
+                stats.bulletSpeed.level++;
+                stats.bulletSpeed.val += 4;
+                stats.bulletSpeed.cost = Math.floor(stats.bulletSpeed.cost * 1.5);
+                updateUI();
+            }
+        });
+
+        // Phong cảnh hoang tàn
+        let sceneries = [];
+        function createScenery() {
+            sceneries = [];
+            const emojis = ["🪨", "🥀", "🌵", "🦴", "🪵", "🦇", "🏚️"];
+            for(let i = 0; i < 25; i++) {
+                sceneries.push({
+                    x: FENCE_X + 50 + Math.random() * (canvas.width - FENCE_X),
+                    y: Math.random() * canvas.height,
+                    emoji: emojis[Math.floor(Math.random() * emojis.length)],
+                    size: Math.random() * 20 + 20
+                });
+            }
+        }
+
+        class WoodenFence {
+            draw() {
+                if (defense.hp <= 0) return;
+                ctx.save();
+                ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+                ctx.fillRect(FENCE_X + 5, 0, 20, canvas.height);
+                ctx.fillStyle = "#5D4037";
+                ctx.fillRect(FENCE_X - 15, 0, 30, canvas.height);
+                ctx.fillStyle = "#3E2723";
+                for (let y = 10; y < canvas.height; y += 40) ctx.fillRect(FENCE_X - 15, y, 30, 3);
+                ctx.fillStyle = "#4E342E";
+                ctx.fillRect(FENCE_X - 10, 0, 6, canvas.height);
+                ctx.fillRect(FENCE_X + 5, 0, 6, canvas.height);
+                ctx.fillStyle = "#9E9E9E";
+                for (let y = 20; y < canvas.height; y += 40) {
+                    ctx.fillRect(FENCE_X - 8, y, 2, 2);
+                    ctx.fillRect(FENCE_X + 7, y, 2, 2);
+                }
+                if (defense.hp < defense.maxHp) {
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                    const damageHeight = canvas.height * (1 - defense.hp / defense.maxHp);
+                    ctx.fillRect(FENCE_X - 15, canvas.height / 2 - damageHeight / 2, 30, damageHeight);
+                }
+                ctx.restore();
+            }
+        }
+        const barricade = new WoodenFence();
+
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 20;
+                this.speed = 6;
+            }
+            draw() {
+                const angle = Math.atan2(mouseY - this.y, mouseX - this.x);
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.font = "40px Arial";
+                ctx.fillText("🤠", 0, 0);
+                ctx.rotate(angle);
+                if (Math.abs(angle) > Math.PI / 2) ctx.scale(1, -1);
+                ctx.font = "25px Arial";
+                ctx.fillText("🔫", 30, 0);
+                ctx.restore();
+            }
+            update() {
+                if (keys['w'] && this.y - this.radius > 0) this.y -= this.speed;
+                if (keys['s'] && this.y + this.radius < canvas.height) this.y += this.speed;
+                if (keys['a'] && this.x - this.radius > 0) this.x -= this.speed;
+                if (keys['d'] && this.x + this.radius < FENCE_X - 25) this.x += this.speed;
+                this.draw();
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, velocity) {
+                this.x = x;
+                this.y = y;
+                this.radius = 10;
+                this.velocity = velocity;
+            }
+            draw() {
+                ctx.font = "20px Arial";
+                ctx.fillText("🔥", this.x, this.y);
+            }
+            update() {
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.draw();
+            }
+        }
+
+        class Enemy {
+            constructor(x, y, speedMult, isBoss, level) {
+                this.x = x;
+                this.y = y;
+                this.isBoss = isBoss;
+                
+                if (isBoss) {
+                    this.radius = 35;
+                    this.maxHp = 15 + (level * 10); // Máu Boss cực cao
+                    this.baseSpeed = Math.random() * 0.5 + 0.8 + (speedMult * 0.5); // Chạy chậm hơn tí
+                    this.damage = 0.5; // Cào rào đau hơn
+                    this.emoji = "👹";
+                    this.scoreVal = 50 + (level * 10);
+                } else {
+                    this.radius = 20;
+                    this.maxHp = 1 + Math.floor(level / 3); // Máu creep tăng dần theo màn
+                    this.baseSpeed = Math.random() * 1.2 + 1 + speedMult;
+                    this.damage = 0.15;
+                    this.emoji = "🧟";
+                    this.scoreVal = 10;
+                }
+                
+                this.hp = this.maxHp;
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.scale(-1, 1);
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.font = `${this.radius * 2}px Arial`;
+                ctx.fillText(this.emoji, 0, 0);
+                
+                // Vẽ thanh máu nếu bị thương
+                if (this.hp < this.maxHp) {
+                    ctx.scale(-1, 1); // Lật lại trục để vẽ thanh máu đúng chiều
+                    ctx.fillStyle = "#ff4c4c"; // Máu đã mất
+                    const barWidth = this.radius * 1.5;
+                    ctx.fillRect(-barWidth/2, -this.radius - 10, barWidth, 6);
+                    ctx.fillStyle = "#4CAF50"; // Máu còn lại
+                    ctx.fillRect(-barWidth/2, -this.radius - 10, barWidth * (this.hp / this.maxHp), 6);
+                }
+                
+                ctx.restore();
+            }
+            
+            update() {
+                if (this.x > FENCE_X + this.radius || defense.hp <= 0) {
+                    this.x -= this.baseSpeed;
+                    if (player.y > this.y) this.y += this.baseSpeed * 0.2;
+                    if (player.y < this.y) this.y -= this.baseSpeed * 0.2;
+                } else {
+                    defense.hp -= this.damage;
+                    updateUI();
+                }
+                this.draw();
+            }
+        }
+
+        let player = new Player(120, canvas.height / 2);
+        let bullets = [];
+        let enemies = [];
+        const keys = {};
+
+        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+        window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+        window.addEventListener('mousedown', () => { if(gameActive) isShooting = true; });
+        window.addEventListener('mouseup', () => { isShooting = false; });
+        window.addEventListener('mouseleave', () => { isShooting = false; });
+
+        function shoot() {
+            const now = Date.now();
+            if (isShooting && gameActive && now - lastShotTime > stats.fireRate.val) {
+                const bulletCount = stats.multishot.val; 
+                const spreadAngle = 0.15;
+                const baseAngle = Math.atan2(mouseY - player.y, mouseX - player.x);
+                const startAngle = baseAngle - (spreadAngle * (bulletCount - 1)) / 2;
+
+                for (let i = 0; i < bulletCount; i++) {
+                    const angle = startAngle + (i * spreadAngle);
+                    const velocity = {
+                        x: Math.cos(angle) * stats.bulletSpeed.val,
+                        y: Math.sin(angle) * stats.bulletSpeed.val
+                    };
+                    bullets.push(new Bullet(player.x, player.y, velocity));
+                }
+                lastShotTime = now;
+            }
+        }
+
+        // Logic Bắt Đầu Màn Mới
+        function startLevel() {
+            gameActive = true;
+            zombiesToSpawn = 8 + (currentLevel * 4);
+            bossesToSpawn = Math.ceil(currentLevel / 2); // Cứ 2 màn tăng 1 Boss (Màn 1 có 1 boss, màn 3 có 2...)
+            zombiesSpawnedCount = 0;
+            zombiesKilledCount = 0;
+            
+            let difficultyMultiplier = currentLevel * 0.15; 
+            let spawnRate = Math.max(400, 1500 - (currentLevel * 150)); 
+
+            createScenery(); 
+            updateUI();
+
+            spawnInterval = setInterval(() => {
+                if (!gameActive) return;
+
+                if (zombiesSpawnedCount < zombiesToSpawn) {
+                    const x = canvas.width + 50;
+                    const y = Math.random() * (canvas.height - 80) + 40;
+                    
+                    // Boss sẽ được sinh ra ở những lượt cuối cùng của màn
+                    let isBoss = false;
+                    if (zombiesToSpawn - zombiesSpawnedCount <= bossesToSpawn) {
+                        isBoss = true;
+                    }
+
+                    enemies.push(new Enemy(x, y, difficultyMultiplier, isBoss, currentLevel));
+                    zombiesSpawnedCount++;
+                } else {
+                    clearInterval(spawnInterval); 
+                }
+            }, spawnRate);
+            
+            animate();
+        }
+
+        // Chuyển Màn
+        function handleLevelComplete() {
+            gameActive = false;
+            cancelAnimationFrame(animationId);
+            
+            let bonusScore = currentLevel * 150; 
+            score += bonusScore;
+            defense.hp = defense.maxHp; 
+            
+            rewardTextEl.innerHTML = `🎁 Thưởng qua màn: <span style="color:#4CAF50">+${bonusScore} Điểm</span> & Hồi 100% Hàng Rào!`;
+            levelCompleteScreen.style.display = 'block';
+            updateUI();
+        }
+
+        nextLevelBtn.addEventListener('click', () => {
+            currentLevel++;
+            levelCompleteScreen.style.display = 'none';
+            bullets = []; 
+            player.y = canvas.height / 2; 
+            startLevel(); 
+        });
+
+        // Chơi lại từ đầu
+        function restartGame() {
+            score = 0;
+            currentLevel = 1;
+            defense = { hp: 100, maxHp: 100, repairCost: 50 };
+            stats = {
+                multishot: { level: 1, cost: 100, val: 1 },
+                fireRate: { level: 1, cost: 75, val: 400 },
+                bulletSpeed: { level: 1, cost: 50, val: 12 },
+                damage: 1
+            };
+            isShooting = false;
+            
+            gameOverScreen.style.display = 'none';
+            enemies = [];
+            bullets = [];
+            player = new Player(120, canvas.height / 2);
+
+            startLevel();
+        }
+        restartBtn.addEventListener('click', restartGame);
+
+        // Vòng lặp vẽ hình
+        function animate() {
+            if (!gameActive) return;
+            animationId = requestAnimationFrame(animate);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Vẽ nền và cảnh vật bên trong căn cứ
+            ctx.textAlign = "center";
+            ctx.font = "80px Arial"; ctx.fillText("⛺", 60, 100);
+            ctx.font = "60px Arial"; ctx.fillText("🌲", 80, 250);
+            ctx.font = "60px Arial"; ctx.fillText("🌲", 50, canvas.height - 100);
+
+            sceneries.forEach(s => {
+                ctx.font = `${s.size}px Arial`;
+                ctx.fillText(s.emoji, s.x, s.y);
+            });
+            
+            barricade.draw();
+            player.update();
+            shoot();
+
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.update();
+                if (bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                enemy.update();
+
+                if (enemy.x + enemy.radius < 0) {
+                    enemies.splice(i, 1);
+                    continue;
+                }
+
+                // KIỂM TRA THUA GAME: Chạm người chơi
+                const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+                if (distToPlayer < enemy.radius + player.radius - 10) {
+                    gameActive = false;
+                    cancelAnimationFrame(animationId);
+                    clearInterval(spawnInterval);
+                    
+                    document.getElementById('finalLevel').innerHTML = currentLevel;
+                    document.getElementById('finalScore').innerHTML = score;
+                    gameOverScreen.style.display = 'block';
+                    return; 
+                }
+
+                // Va chạm Đạn - Zombie
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const bullet = bullets[j];
+                    const distToBullet = Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y);
+
+                    if (distToBullet < enemy.radius + bullet.radius) {
+                        enemy.hp -= stats.damage; // Trừ máu theo sát thương súng
+                        bullets.splice(j, 1);     // Mất đạn
+                        
+                        // Quái chết
+                        if (enemy.hp <= 0) {
+                            score += enemy.scoreVal;
+                            enemies.splice(i, 1);
+                            zombiesKilledCount++; 
+                            updateUI();
+                        }
+                        break; // Viên đạn chỉ trúng 1 mục tiêu
+                    }
+                }
+            }
+
+            // KIỂM TRA THẮNG MÀN
+            if (zombiesSpawnedCount >= zombiesToSpawn && enemies.length === 0) {
+                handleLevelComplete();
+            }
+        }
+
+        // Bắt đầu
+        updateUI();
+        startLevel();
+    </script>
+</body>
+</html>
